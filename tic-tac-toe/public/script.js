@@ -13,6 +13,7 @@ const firebaseConfig = {
   appId: "1:119223402145:web:bab29e94933d4c011a7ae0",
   measurementId: "G-83EEGG26ZP"
 };
+let localLastUpdate = 0; // timestamp of the last DB update we initiated locally
 
 // Initialize Firebase (modular)
 let app, db;
@@ -92,23 +93,30 @@ async function createRoom() {
 
   roomRef = ref(db, 'rooms/' + currentRoomId);
 
+  // create board object (0: null, 1: null, ..., 8: null)
+  const emptyBoardObj = {};
+  for (let i = 0; i < 9; i++) emptyBoardObj[i] = null;
+
   await set(roomRef, {
-    board: Array(9).fill(null),
+    board: emptyBoardObj,
     players: 1,
     currentTurn: 'X',
     winner: null,
     winningLine: [],
     gameStarted: false,
-    lastUpdate: Date.now()
+    lastUpdate: Date.now()  // timestamp for ordering updates
   });
 
+  // Update UI
   document.getElementById('displayRoomId').textContent = currentRoomId;
   document.getElementById('roomInfo').classList.remove('hidden');
   document.getElementById('waitingMessage').style.display = 'block';
   document.getElementById('playerRole').textContent = 'You are: X';
 
-  // attach listener
+  // detach previous listener if exists
   if (unsubscribeRoom) { unsubscribeRoom(); unsubscribeRoom = null; }
+
+  // attach listener
   unsubscribeRoom = onValue(roomRef, (snapshot) => {
     const data = snapshot.val();
     if (!data) return;
@@ -121,9 +129,8 @@ async function createRoom() {
       startOnlineGame(false); // false = don't reset DB (we already have DB)
     }
 
-    // If players become 2 and game wasn't started, set gameStarted remotely (let DB be source of truth)
+    // If players become 2 and game wasn't started, set gameStarted remotely
     if (data.players === 2 && !data.gameStarted) {
-      // set DB gameStarted true (this will trigger the onValue again)
       update(roomRef, { gameStarted: true, lastUpdate: Date.now() }).catch(e => console.error(e));
     }
 
@@ -133,6 +140,7 @@ async function createRoom() {
     console.error("Firebase listener error (creator):", err);
   });
 }
+
 
 // ---------------- Online: join room ----------------
 async function joinRoom() {
@@ -225,27 +233,48 @@ function startOnlineGame(resetLocal = true) {
 function updateOnlineGame(data) {
   if (!data || !data.gameStarted) return;
 
-  // Build fresh array copying DB values (handle sparse arrays safely)
+  // If DB's lastUpdate is older than our last local update, ignore it.
+  if (data.lastUpdate && localLastUpdate && data.lastUpdate < localLastUpdate) {
+    console.log("Ignored older DB snapshot (lastUpdate)", data.lastUpdate, "<", localLastUpdate);
+    return;
+  }
+
+  // Build fresh board from DB robustly whether DB stored an array or object
   const newBoard = Array(9).fill(null);
-  if (data.board && Array.isArray(data.board)) {
-    for (let i = 0; i < 9; i++) {
-      newBoard[i] = (typeof data.board[i] === 'string' ? data.board[i] : null);
+  if (data.board) {
+    if (Array.isArray(data.board)) {
+      for (let i = 0; i < 9; i++) {
+        newBoard[i] = (typeof data.board[i] === 'string' ? data.board[i] : null);
+      }
+    } else if (typeof data.board === 'object') {
+      // DB may store board as object with numeric keys (safest)
+      for (let i = 0; i < 9; i++) {
+        newBoard[i] = (data.board.hasOwnProperty(i) && typeof data.board[i] === 'string') ? data.board[i] : null;
+      }
     }
   }
 
-  board = newBoard;
+  // If DB doesn't include board at all, ignore (don't wipe local)
+  if (!data.hasOwnProperty('board')) {
+    console.log("DB snapshot missing board — skipping board overwrite.");
+  } else {
+    // Only replace the local board if this DB snapshot is newer or we have no board
+    board = newBoard;
+  }
+
   winner = data.winner || null;
   winningLine = Array.isArray(data.winningLine) ? data.winningLine : [];
   isXNext = data.currentTurn === 'X';
 
-  // Determine turn based on DB's authoritative currentTurn and winner
+  // Determine my turn based on DB's authoritative currentTurn and winner
   isMyTurn = (data.currentTurn === playerSymbol) && !winner;
   gameStarted = true;
 
-  console.log("📥 updateOnlineGame -> isMyTurn:", isMyTurn, "currentTurn:", data.currentTurn, "winner:", winner);
+  console.log("📥 updateOnlineGame -> isMyTurn:", isMyTurn, "currentTurn:", data.currentTurn, "winner:", winner, "lastUpdate:", data.lastUpdate);
   updateBoard();
   updateStatus();
 }
+
 
 // ---------------- copy / menu ----------------
 async function copyRoomId() {
@@ -376,54 +405,58 @@ async function handleClick(idx) {
     return;
   }
 
-  if (mode === 'online') {
-    if (!gameStarted) {
-      alert("Waiting for opponent...");
-      return;
-    }
-    if (!isMyTurn) {
-      alert("Wait for your turn!");
-      return;
-    }
+    if (mode === 'online') {
+      if (!gameStarted) { alert("Waiting for opponent..."); return; }
+      if (!isMyTurn) { alert("Wait for your turn!"); return; }
 
-    // create copy, set move locally for instant feedback
-    const newBoard = board.slice();
-    newBoard[idx] = playerSymbol;
-    board = newBoard;
-    updateBoard();
-    updateStatus();
-
-    // compute result
-    const result = checkWinner(newBoard);
-    const newWinner = result ? result.winner : null;
-    const newWinningLine = result ? result.line : [];
-
-    const nextTurn = (playerSymbol === 'X') ? 'O' : 'X';
-
-    // push authoritative update to DB
-    const updates = {
-      board: newBoard,
-      currentTurn: nextTurn,
-      winner: newWinner,
-      winningLine: newWinningLine,
-      lastUpdate: Date.now()
-    };
-
-    try {
-      await update(roomRef, updates);
-      console.log("Firebase updated");
-      // We rely on DB -> onValue to update isMyTurn for both sides.
-      isMyTurn = false;
-    } catch (err) {
-      console.error("Firebase update error:", err);
-      // revert
-      board[idx] = null;
+      // create copy, set move locally for instant feedback
+      const newBoard = board.slice();
+      newBoard[idx] = playerSymbol;
+      board = newBoard;
       updateBoard();
       updateStatus();
-      alert("Connection error. Try again.");
+
+      // compute result
+      const result = checkWinner(newBoard);
+      const newWinner = result ? result.winner : null;
+      const newWinningLine = result ? result.line : [];
+      const nextTurn = (playerSymbol === 'X') ? 'O' : 'X';
+
+      // Build board object (0:'X', 1:'O', etc.) to avoid RTDB array quirks
+      const boardObj = {};
+      for (let i = 0; i < 9; i++) {
+        if (newBoard[i] !== null) boardObj[i] = newBoard[i];
+        else boardObj[i] = null; // keep explicit nulls if you prefer
+      }
+
+      // Add timestamp for ordering
+      const now = Date.now();
+      const updates = {
+        board: boardObj,
+        currentTurn: nextTurn,
+        winner: newWinner,
+        winningLine: newWinningLine,
+        lastUpdate: now
+      };
+
+      try {
+        await update(roomRef, updates);
+        // record our lastUpdate — used to ignore stale incoming snapshots
+        localLastUpdate = now;
+        console.log("Firebase updated (with boardObj), lastUpdate:", now);
+        isMyTurn = false; // we'll rely on DB snapshots to flip back for opponent
+      } catch (err) {
+        console.error("Firebase update error:", err);
+        // revert on error
+        board[idx] = null;
+        updateBoard();
+        updateStatus();
+        alert("Connection error. Try again.");
+      }
     }
 
-  } else if (mode === 'single') {
+
+   else if (mode === 'single') {
     // keep your single-player code (unchanged)
     board[idx] = 'X';
     updateBoard();
