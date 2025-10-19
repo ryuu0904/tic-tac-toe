@@ -5,14 +5,16 @@
 }
 
 body {
-    font-family: 'Georgia', 'Garamond', serif;
-    min-height: 100vh;
+    font-family: 'Press Start 2P';
     background: linear-gradient(135deg, #ffd4e5 0%, #c5d8f5 50%, #e5d4ff 100%);
+    position: relative;
+    background-image: url('images/dark_wood.png');
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-    position: relative;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0; /* optional: remove padding */
 }
 
 body::before {
@@ -57,6 +59,7 @@ body::before {
     width: 100%;
     position: relative;
     border: 6px solid #6d5638;
+    background-image: url('images/Material_wood_static_gas.png');
 }
 
 .card::before {
@@ -88,7 +91,7 @@ body::before {
 }
 
 h1 {
-    font-size: 3rem;
+    font-size: 2rem;
     text-align: center;
     color: #fff5e6;
     margin-bottom: 8px;
@@ -111,11 +114,13 @@ h1 {
     gap: 20px;
 }
 
+/* General mode button styling */
 .mode-btn {
     width: 100%;
-    background: linear-gradient(145deg, #8b6f47, #a0826d);
+    background: linear-gradient(145deg, #8b6f47, #a0826d); /* Woody gradient */
     color: #fff5e6;
     font-size: 1.4rem;
+    font-family: 'Press Start 2P', cursive; /* Pixel font */
     font-weight: 600;
     padding: 28px;
     border: 4px solid #6d5638;
@@ -131,7 +136,6 @@ h1 {
         inset 0 -2px 4px rgba(0, 0, 0, 0.2);
     transition: all 0.3s ease;
     position: relative;
-    font-family: 'Georgia', serif;
     letter-spacing: 1px;
 }
 
@@ -140,14 +144,13 @@ h1 {
     position: absolute;
     inset: 0;
     border-radius: 16px;
-    background: 
-        repeating-linear-gradient(
-            90deg,
-            transparent,
-            transparent 2px,
-            rgba(101, 67, 33, 0.05) 2px,
-            rgba(101, 67, 33, 0.05) 4px
-        );
+    background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 2px,
+        rgba(101, 67, 33, 0.05) 2px,
+        rgba(101, 67, 33, 0.05) 4px
+    );
     pointer-events: none;
 }
 
@@ -160,38 +163,28 @@ h1 {
     border-color: #8b7355;
 }
 
-.mode-btn:active {
-    transform: translateY(-1px);
+/* Optional individual tweaks if needed */
+.single-player, .two-player, .online-player, .create-btn, .join-btn {
+    background: linear-gradient(145deg, #8b6f47, #a0826d);
+    border-color: #6d5638;
+    color: #fff5e6;
+    
 }
 
-.single-player {
-    background: linear-gradient(145deg, #b4a7d6, #c9b8eb);
-    border-color: #8b7ba8;
-    color: #4a3f6b;
+.single-player:hover, .two-player:hover, .online-player:hover, .create-btn:hover, .join-btn:hover {
+    border-color: #8b7355;
 }
 
-.single-player:hover {
-    border-color: #a391c9;
-}
-
-.two-player {
-    background: linear-gradient(145deg, #a8d5ba, #bfe5cc);
-    border-color: #7ea88f;
-    color: #3d5c48;
-}
-
-.two-player:hover {
-    border-color: #96c4a8;
-}
 
 .online-player {
-    background: linear-gradient(145deg, #f5d4a8, #ffd8a8);
-    border-color: #d4a574;
-    color: #6b4423;
+    background: linear-gradient(145deg, #8b6f47, #a0826d); /* woody gradient */
+    border-color: #6d5638;
+    color: #fff5e6;
 }
 
 .online-player:hover {
-    border-color: #e8b888;
+    border-color: #8b7355;
+    transform: translateY(-2px);
 }
 
 .back-btn {
@@ -239,14 +232,14 @@ h1 {
 }
 
 .create-btn {
-    background: linear-gradient(145deg, #a8d5ba, #bfe5cc);
-    border-color: #7ea88f;
-    color: #3d5c48;
+    background: linear-gradient(145deg, #8b6f47, #a0826d); /* woody gradient */
+    border-color: #6d5638;
+    color: #fff5e6;
 }
 
 .create-btn:hover {
+    border-color: #8b7355;
     transform: translateY(-2px);
-    border-color: #96c4a8;
 }
 
 .join-room-container {
@@ -266,7 +259,7 @@ h1 {
     text-transform: uppercase;
     letter-spacing: 2px;
     background: linear-gradient(145deg, #f5e6d3, #ede0c8);
-    color: #6d5638;
+    color: #534027;
 }
 
 #roomIdInput:focus {
@@ -276,14 +269,14 @@ h1 {
 }
 
 .join-btn {
-    background: linear-gradient(145deg, #b4a7d6, #c9b8eb);
-    border-color: #8b7ba8;
-    color: #4a3f6b;
+    background: linear-gradient(145deg, #8b6f47, #a0826d); /* woody gradient */
+    border-color: #6d5638;
+    color: #fff5e6;
 }
 
 .join-btn:hover {
+    border-color: #8b7355;
     transform: translateY(-2px);
-    border-color: #a391c9;
 }
 
 .room-info {
@@ -320,7 +313,7 @@ h1 {
 
 .copy-btn {
     background: #fff5e6;
-    border: 2px solid #d4af37;
+    border: 2px solid #74632c;
     border-radius: 8px;
     padding: 8px;
     cursor: pointer;
@@ -401,19 +394,20 @@ h1 {
 }
 
 .status-box {
-    background: linear-gradient(145deg, #ffd4e5, #ffb3d9);
-    color: #8b4367;
+    background: linear-gradient(145deg, #8b6f47, #a0826d); /* wood gradient */
+    color: #fff5e6; /* light text for contrast */
     padding: 14px 28px;
     border-radius: 18px;
-    border: 3px solid #d4a5c0;
+    border: 3px solid #6d5638;
     font-weight: 600;
     display: inline-block;
     font-size: 1.1rem;
     box-shadow: 
-        0 4px 15px rgba(212, 165, 192, 0.4),
+        0 4px 15px rgba(101, 67, 33, 0.4),
         inset 0 1px 2px rgba(255, 255, 255, 0.5);
     letter-spacing: 0.5px;
 }
+
 
 .status-box.winner {
     background: linear-gradient(145deg, #ffe4a8, #ffd780);
@@ -500,14 +494,23 @@ h1 {
 }
 
 .cell.x {
-    color: #b4a7d6;
-    text-shadow: 2px 2px 4px rgba(180, 167, 214, 0.4);
+    color: #b08b4f; /* Light wood tone */
+    text-shadow: 
+        2px 2px 0 #8b5a2b,   /* Darker shadow for depth */
+        -2px -2px 0 #a6784f,
+        1px -1px 0 #a6784f,
+        -1px 1px 0 #8b5a2b;
 }
 
 .cell.o {
-    color: #f5a9b8;
-    text-shadow: 2px 2px 4px rgba(245, 169, 184, 0.4);
+    color: #d2a679; /* Slightly lighter wood tone */
+    text-shadow: 
+        2px 2px 0 #a6784f,   /* Darker shadow for depth */
+        -2px -2px 0 #8b5a2b,
+        1px -1px 0 #8b5a2b,
+        -1px 1px 0 #a6784f;
 }
+
 
 .cell.winning {
     background: linear-gradient(145deg, #c8e6c9, #a5d6a7);
@@ -531,22 +534,23 @@ h1 {
 .player-info {
     text-align: center;
     color: #f5e6d3;
-    font-size: 1rem;
+    font-size: 0.8rem;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
     letter-spacing: 0.5px;
 }
 
 .player-x {
     font-weight: bold;
-    color: #d4c5e8;
-    text-shadow: 1px 1px 3px rgba(180, 167, 214, 0.6);
+    color: #8b6f47; /* dark wood brown */
+    text-shadow: 1px 1px 2px rgba(101, 67, 33, 0.6);
 }
 
 .player-o {
     font-weight: bold;
-    color: #ffc9d6;
-    text-shadow: 1px 1px 3px rgba(245, 169, 184, 0.6);
+    color: #a0826d; /* lighter wood brown */
+    text-shadow: 1px 1px 2px rgba(139, 111, 71, 0.6);
 }
+
 
 @media (max-width: 480px) {
     .card {
@@ -571,3 +575,124 @@ h1 {
         padding: 12px;
     }
 }
+.cell {
+    aspect-ratio: 1;
+    background: linear-gradient(145deg, #5d4e3a, #6d5638); /* dark wood board */
+    border: 4px solid #4a3829;
+    border-radius: 16px;
+    font-family: 'Press Start 2P', cursive; /* keep the pixel font */
+    font-size: 3rem; /* smaller than body font */
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-shadow: 
+        0 4px 10px rgba(101, 67, 33, 0.3),
+        inset 0 2px 4px rgba(255, 255, 255, 0.3);
+    overflow: hidden;
+}
+/* Center all buttons and headings */
+.button-container,
+.online-options,
+.join-room-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* center horizontally */
+    gap: 20px;
+}
+
+/* Mode buttons: single-player, two-player, online */
+.mode-btn,
+.online-action-btn,
+.create-btn,
+.join-btn {
+    width: 80%; /* nice width for all buttons */
+    max-width: 300px;
+    background: linear-gradient(145deg, #8b6f47, #a0826d); /* woody gradient */
+    color: #fff5e6;
+    font-size: 1.2rem; /* smaller than body font to fit nicely */
+    font-weight: 600;
+    padding: 20px;
+    border: 4px solid #6d5638;
+    border-radius: 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    box-shadow: 
+        0 8px 20px rgba(101, 67, 33, 0.4),
+        inset 0 2px 4px rgba(255, 255, 255, 0.2),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+    font-family: 'Press Start 2P', cursive;
+}
+
+/* Online mode buttons specific */
+.online-action-btn {
+    background: linear-gradient(145deg, #8b6f47, #a0826d);
+    border-color: #6d5638;
+    color: #fff5e6;
+}
+
+.online-action-btn:hover,
+.create-btn:hover,
+.join-btn:hover {
+    transform: translateY(-2px);
+    border-color: #8b7355;
+}
+
+/* Center mode heading like "Vs Computer" or "Two Player" */
+.online-options h2,
+.mode-btn h2 {
+    text-align: center;
+    width: 100%;
+}
+
+/* Optional: room input styling */
+#roomIdInput {
+    width: 80%;
+    max-width: 300px;
+    text-align: center;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 3px solid #6d5638;
+    background: linear-gradient(145deg, #a0826d, #8b6f47);
+    color: #fff5e6;
+}
+#roomIdInput::placeholder {
+    color: #ffedc1; /* light creamy color for visibility on dark wood background */
+    opacity: 1; /* ensures the color is fully visible */
+}
+
+
+#roomIdInput:focus {
+    outline: none;
+    border-color: #d4af37;
+    background: linear-gradient(145deg, #a0826d, #8b6f47);
+}
+.game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* buttons stay at ends */
+    position: relative;             /* for absolute child positioning */
+    margin-bottom: 24px;
+}
+
+#modeTitle {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 1rem;       /* adjust font size if needed */
+    color: #fff5e6;
+    max-width: 60%;           /* prevents it from overlapping buttons */
+    word-wrap: break-word;     /* wrap text if too long */
+    line-height: 1.4;          /* increases space between wrapped lines */
+}
+
