@@ -21,9 +21,9 @@ try {
         firebase.initializeApp(firebaseConfig);
     }
     db = firebase.database();
-    console.log("Firebase initialized successfully");
+    console.log("✅ Firebase initialized");
 } catch (error) {
-    console.error("Firebase initialization error:", error);
+    console.error("❌ Firebase error:", error);
 }
 
 let mode = null;
@@ -39,6 +39,7 @@ let playerSymbol = null;
 let roomRef = null;
 let isMyTurn = false;
 let gameStarted = false;
+let processingMove = false; // NEW: Prevent double-clicks
 
 const winPatterns = [
     [0, 1, 2], [3, 4, 5], [6, 7, 8],
@@ -56,7 +57,7 @@ function selectMode(selectedMode) {
     
     if (mode === 'online') {
         if (!db) {
-            alert('Firebase is not configured. Please add your Firebase config to script.js');
+            alert('Firebase not configured');
             return;
         }
         document.getElementById('modeSelection').classList.add('hidden');
@@ -87,25 +88,17 @@ function createRoom() {
     playerSymbol = 'X';
     isMyTurn = true;
     gameStarted = false;
+    processingMove = false;
     
     roomRef = db.ref('rooms/' + currentRoomId);
     
-    const initialData = {
+    roomRef.set({
         board: Array(9).fill(null),
         players: 1,
         currentTurn: 'X',
         winner: null,
         winningLine: [],
-        playerX: true,
-        playerO: false,
-        gameStarted: false,
-        createdAt: Date.now()
-    };
-    
-    roomRef.set(initialData).then(() => {
-        console.log("Room created:", currentRoomId, initialData);
-    }).catch((error) => {
-        console.error("Error creating room:", error);
+        gameStarted: false
     });
     
     document.getElementById('displayRoomId').textContent = currentRoomId;
@@ -113,25 +106,18 @@ function createRoom() {
     document.getElementById('waitingMessage').style.display = 'block';
     document.getElementById('playerRole').textContent = 'You are: X';
     
-    // Listen for second player and game updates
     roomRef.on('value', (snapshot) => {
         const data = snapshot.val();
         if (!data) return;
         
-        console.log("📡 Room data updated:", data);
+        console.log("📡 [Creator] Firebase update:", data);
         
-        // Check if second player joined
         if (data.players === 2 && !gameStarted) {
             gameStarted = true;
-            console.log("🎮 Second player joined! Starting game...");
-            
-            // Update gameStarted in Firebase
             roomRef.update({ gameStarted: true });
-            
             document.getElementById('waitingMessage').style.display = 'none';
             startOnlineGame();
         } else if (gameStarted) {
-            // Update game state
             updateOnlineGame(data);
         }
     });
@@ -139,7 +125,7 @@ function createRoom() {
 
 function joinRoom() {
     const roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
-    console.log("Attempting to join room:", roomId);
+    console.log("Joining room:", roomId);
     
     if (!roomId) {
         alert('Please enter a Room ID');
@@ -154,30 +140,22 @@ function joinRoom() {
         
         if (!data) {
             alert('Room not found!');
-            console.error("Room not found:", roomId);
             return;
         }
         
         if (data.players >= 2) {
             alert('Room is full!');
-            console.error("Room is full:", roomId);
             return;
         }
         
         playerSymbol = 'O';
-        isMyTurn = false;  // O goes second
+        isMyTurn = false;
         gameStarted = true;
-        
-        console.log("Joining as player O");
+        processingMove = false;
         
         roomRef.update({
             players: 2,
-            playerO: true,
             gameStarted: true
-        }).then(() => {
-            console.log("✅ Joined room successfully as O");
-            console.log("Current turn is:", data.currentTurn);
-            console.log("My turn will be when currentTurn is: O");
         });
         
         document.getElementById('displayRoomId').textContent = currentRoomId;
@@ -187,38 +165,34 @@ function joinRoom() {
         
         startOnlineGame();
         
-        // Listen for game updates
         roomRef.on('value', (snapshot) => {
             const data = snapshot.val();
             if (data) {
-                console.log("📡 Room update received:", data);
+                console.log("📡 [Joiner] Firebase update:", data);
                 updateOnlineGame(data);
             }
         });
-    }).catch((error) => {
-        console.error("Error joining room:", error);
-        alert('Error joining room. Please try again.');
     });
 }
 
 function startOnlineGame() {
-    console.log("Starting online game as:", playerSymbol);
+    console.log("🎮 Starting game as:", playerSymbol);
     document.getElementById('onlineScreen').classList.add('hidden');
     document.getElementById('gameScreen').classList.remove('hidden');
     
     const modeTitle = document.getElementById('modeTitle');
     const playerInfo = document.getElementById('playerInfo');
     
-    modeTitle.textContent = 'Online Match - Room: ' + currentRoomId;
+    modeTitle.textContent = 'Online - Room: ' + currentRoomId;
     playerInfo.innerHTML = `You are: <span class="player-${playerSymbol.toLowerCase()}">${playerSymbol}</span>`;
     playerInfo.style.display = 'block';
     
-    // Initialize the board
     board = Array(9).fill(null);
     winner = null;
     winningLine = [];
     isXNext = true;
     isMyTurn = (playerSymbol === 'X');
+    processingMove = false;
     
     updateBoard();
     updateStatus();
@@ -227,19 +201,32 @@ function startOnlineGame() {
 function updateOnlineGame(data) {
     if (!data || !gameStarted) return;
     
-    console.log("Updating online game with data:", data);
-    console.log("Current turn in Firebase:", data.currentTurn, "I am:", playerSymbol);
+    console.log("\n📥 Updating from Firebase");
+    console.log("Firebase board:", data.board);
+    console.log("Firebase turn:", data.currentTurn);
+    console.log("I am:", playerSymbol);
     
-    // Update local state from Firebase
-    board = data.board || Array(9).fill(null);
+    // Convert Firebase board to proper array
+    const newBoard = Array(9).fill(null);
+    if (data.board) {
+        for (let i = 0; i < 9; i++) {
+            newBoard[i] = data.board[i] || null;
+        }
+    }
+    
+    console.log("Old board:", board);
+    console.log("New board:", newBoard);
+    
+    // Update local state
+    board = newBoard;
     winner = data.winner || null;
     winningLine = data.winningLine || [];
     isXNext = data.currentTurn === 'X';
+    isMyTurn = (data.currentTurn === playerSymbol) && !winner;
+    processingMove = false; // CRITICAL: Re-enable clicking after Firebase update
     
-    // Determine if it's my turn - CRITICAL FIX
-    isMyTurn = (data.currentTurn === playerSymbol) && (winner === null);
-    
-    console.log("Is it my turn?", isMyTurn, "Winner:", winner);
+    console.log("✅ My turn now?", isMyTurn);
+    console.log("Processing move?", processingMove);
     
     updateBoard();
     updateStatus();
@@ -248,30 +235,23 @@ function updateOnlineGame(data) {
 function copyRoomId() {
     const roomId = document.getElementById('displayRoomId').textContent;
     navigator.clipboard.writeText(roomId).then(() => {
-        alert('Room ID copied to clipboard!');
+        alert('Room ID copied!');
     }).catch(() => {
-        // Fallback for older browsers
         const textArea = document.createElement('textarea');
         textArea.value = roomId;
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        alert('Room ID copied to clipboard!');
+        alert('Room ID copied!');
     });
 }
 
 function goToMenu() {
-    console.log("Going to menu");
-    
-    // Clean up online game
     if (roomRef) {
         roomRef.off();
-        if (currentRoomId && mode === 'online') {
-            // Only delete room if we're the creator (player X)
-            if (playerSymbol === 'X') {
-                db.ref('rooms/' + currentRoomId).remove();
-            }
+        if (currentRoomId && mode === 'online' && playerSymbol === 'X') {
+            db.ref('rooms/' + currentRoomId).remove();
         }
     }
     
@@ -281,6 +261,7 @@ function goToMenu() {
     roomRef = null;
     isMyTurn = false;
     gameStarted = false;
+    processingMove = false;
     
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('onlineScreen').classList.add('hidden');
@@ -292,7 +273,6 @@ function goToMenu() {
 }
 
 function checkWinner(currentBoard) {
-    // Check all winning patterns
     for (let pattern of winPatterns) {
         const [a, b, c] = pattern;
         if (currentBoard[a] && 
@@ -302,9 +282,7 @@ function checkWinner(currentBoard) {
         }
     }
     
-    // Check for draw - all cells filled
-    const isFull = currentBoard.every(cell => cell !== null);
-    if (isFull) {
+    if (currentBoard.every(cell => cell !== null)) {
         return { winner: 'draw', line: [] };
     }
     
@@ -313,33 +291,25 @@ function checkWinner(currentBoard) {
 
 function makeComputerMove(currentBoard) {
     const emptyCells = currentBoard.map((cell, idx) => cell === null ? idx : null).filter(val => val !== null);
-    
     if (emptyCells.length === 0) return undefined;
     
-    // Try to win
     for (let pattern of winPatterns) {
         const [a, b, c] = pattern;
         const values = [currentBoard[a], currentBoard[b], currentBoard[c]];
-        
         if (values.filter(v => v === 'O').length === 2 && values.includes(null)) {
             return pattern.find(idx => currentBoard[idx] === null);
         }
     }
     
-    // Block player
     for (let pattern of winPatterns) {
         const [a, b, c] = pattern;
         const values = [currentBoard[a], currentBoard[b], currentBoard[c]];
-        
         if (values.filter(v => v === 'X').length === 2 && values.includes(null)) {
             return pattern.find(idx => currentBoard[idx] === null);
         }
     }
     
-    // Take center if available
     if (currentBoard[4] === null) return 4;
-    
-    // Random move
     return emptyCells[Math.floor(Math.random() * emptyCells.length)];
 }
 
@@ -354,7 +324,8 @@ function updateBoard() {
             cell.disabled = true;
         } else {
             if (mode === 'online') {
-                cell.disabled = !isMyTurn || winner !== null;
+                // CRITICAL: Disable if not my turn OR if processing a move
+                cell.disabled = !isMyTurn || winner !== null || processingMove;
             } else {
                 cell.disabled = winner !== null || isComputerThinking;
             }
@@ -364,11 +335,6 @@ function updateBoard() {
             cell.classList.add('winning');
         }
     });
-    
-    const turnPlayer = document.getElementById('turnPlayer');
-    if (turnPlayer) {
-        turnPlayer.textContent = isXNext ? 'X' : 'O';
-    }
 }
 
 function updateStatus() {
@@ -388,7 +354,11 @@ function updateStatus() {
     } else {
         currentTurn.className = 'status-box';
         if (mode === 'online') {
-            currentTurn.innerHTML = isMyTurn ? '✨ Your Turn ✨' : "⏳ Opponent's Turn";
+            if (processingMove) {
+                currentTurn.innerHTML = '⏳ Sending move...';
+            } else {
+                currentTurn.innerHTML = isMyTurn ? '✨ Your Turn ✨' : "⏳ Opponent's Turn";
+            }
         } else {
             currentTurn.innerHTML = `Current Turn: <span id="turnPlayer" class="turn-player">${isXNext ? 'X' : 'O'}</span>`;
         }
@@ -396,102 +366,88 @@ function updateStatus() {
 }
 
 function handleClick(idx) {
-    console.log("Cell clicked:", idx);
-    console.log("Mode:", mode);
-    console.log("My turn:", isMyTurn);
-    console.log("My symbol:", playerSymbol);
-    console.log("Cell value:", board[idx]);
-    console.log("Winner:", winner);
-    console.log("Game started:", gameStarted);
+    console.log("\n🖱️ CLICK on cell", idx);
+    console.log("Board[" + idx + "]:", board[idx]);
+    console.log("My turn?", isMyTurn);
+    console.log("Processing?", processingMove);
+    console.log("Game started?", gameStarted);
     
-    // Basic validation
     if (board[idx] !== null) {
-        console.log("❌ Click ignored - cell already occupied");
+        console.log("❌ Cell occupied");
         return;
     }
     
     if (winner) {
-        console.log("❌ Click ignored - game already over");
-        return;
-    }
-    
-    if (isComputerThinking) {
-        console.log("❌ Click ignored - computer is thinking");
+        console.log("❌ Game over");
         return;
     }
     
     if (mode === 'online') {
         if (!gameStarted) {
-            console.log("❌ Click ignored - game not started yet!");
-            alert("Waiting for opponent to join...");
+            console.log("❌ Game not started");
+            return;
+        }
+        
+        if (processingMove) {
+            console.log("❌ Already processing a move");
             return;
         }
         
         if (!isMyTurn) {
-            console.log("❌ Click ignored - not your turn!");
-            console.log("Current turn should be:", playerSymbol);
+            console.log("❌ Not your turn");
             return;
         }
         
-        console.log("✅ Making online move as", playerSymbol, "at position", idx);
+        console.log("✅ Making move as", playerSymbol);
         
-        // Make the move locally first
+        // Set processing flag IMMEDIATELY
+        processingMove = true;
+        
+        // Update local board immediately for responsiveness
+        board[idx] = playerSymbol;
+        updateBoard();
+        updateStatus();
+        
+        // Create new board for Firebase
         const newBoard = [...board];
-        newBoard[idx] = playerSymbol;
         
-        console.log("New board state:", newBoard);
-        
-        // Check for winner
+        // Check winner
         const result = checkWinner(newBoard);
-        let newWinner = null;
-        let newWinningLine = [];
+        const newWinner = result ? result.winner : null;
+        const newWinningLine = result ? result.line : [];
         
-        if (result) {
-            newWinner = result.winner;
-            newWinningLine = result.line;
-            console.log("🎮 Game over! Winner:", newWinner);
-        }
-        
-        // Determine next turn
+        // Next turn
         const nextTurn = playerSymbol === 'X' ? 'O' : 'X';
-        console.log("Next turn will be:", nextTurn);
         
-        // Update Firebase with atomic update
-        const updates = {
+        console.log("📤 Sending to Firebase:", {
+            idx: idx,
+            symbol: playerSymbol,
+            nextTurn: nextTurn,
+            winner: newWinner
+        });
+        
+        // Send to Firebase
+        roomRef.update({
             board: newBoard,
             currentTurn: nextTurn,
             winner: newWinner,
             winningLine: newWinningLine
-        };
-        
-        console.log("Sending to Firebase:", updates);
-        
-        // Optimistically update local state
-        board = newBoard;
-        winner = newWinner;
-        winningLine = newWinningLine;
-        isMyTurn = false;
-        updateBoard();
-        updateStatus();
-        
-        // Update Firebase
-        roomRef.update(updates).then(() => {
-            console.log("✅ Move sent to Firebase successfully");
+        }).then(() => {
+            console.log("✅ Firebase updated successfully");
         }).catch((error) => {
-            console.error("❌ Error updating Firebase:", error);
-            alert("Error sending move. Please try again.");
-            // Reload game state from Firebase
-            roomRef.once('value').then(snapshot => {
-                const data = snapshot.val();
-                if (data) updateOnlineGame(data);
-            });
+            console.error("❌ Firebase error:", error);
+            // Revert on error
+            board[idx] = null;
+            processingMove = false;
+            updateBoard();
+            updateStatus();
+            alert("Error! Please try again.");
         });
         
     } else if (mode === 'single') {
-        console.log("Single player move");
         board[idx] = 'X';
         updateBoard();
-
+        
         const result = checkWinner(board);
         if (result) {
             winner = result.winner;
@@ -500,7 +456,7 @@ function handleClick(idx) {
             updateStatus();
             return;
         }
-
+        
         isXNext = false;
         isComputerThinking = true;
         updateBoard();
@@ -510,14 +466,12 @@ function handleClick(idx) {
             const computerMove = makeComputerMove(board);
             if (computerMove !== undefined) {
                 board[computerMove] = 'O';
-                
                 const computerResult = checkWinner(board);
                 if (computerResult) {
                     winner = computerResult.winner;
                     winningLine = computerResult.line;
                 }
             }
-            
             isXNext = true;
             isComputerThinking = false;
             updateBoard();
@@ -525,9 +479,7 @@ function handleClick(idx) {
         }, 500);
         
     } else if (mode === 'two') {
-        console.log("Two player local move");
         board[idx] = isXNext ? 'X' : 'O';
-        
         const result = checkWinner(board);
         if (result) {
             winner = result.winner;
@@ -536,7 +488,6 @@ function handleClick(idx) {
             updateStatus();
             return;
         }
-        
         isXNext = !isXNext;
         updateBoard();
         updateStatus();
@@ -544,12 +495,12 @@ function handleClick(idx) {
 }
 
 function resetGame() {
-    console.log("Resetting game");
     board = Array(9).fill(null);
     isXNext = true;
     winner = null;
     winningLine = [];
     isComputerThinking = false;
+    processingMove = false;
     
     if (mode === 'online' && roomRef && gameStarted) {
         isMyTurn = (playerSymbol === 'X');
@@ -558,111 +509,48 @@ function resetGame() {
             currentTurn: 'X',
             winner: null,
             winningLine: []
-        }).then(() => {
-            console.log("Game reset in Firebase");
         });
     }
-    
-    const cells = document.querySelectorAll('.cell');
-    cells.forEach(cell => {
-        cell.disabled = false;
-    });
     
     updateBoard();
     updateStatus();
 }
 
-// Setup event listeners after DOM is loaded
+// Event listeners
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Page loaded - Setting up event listeners");
+    console.log("✅ Page loaded");
     
-    // Mode selection buttons
     const singleBtn = document.getElementById('singlePlayerBtn');
     const twoBtn = document.getElementById('twoPlayerBtn');
     const onlineBtn = document.getElementById('onlinePlayerBtn');
     
-    if (singleBtn) {
-        singleBtn.addEventListener('click', () => {
-            console.log("Single player button clicked");
-            selectMode('single');
-        });
-    }
-    if (twoBtn) {
-        twoBtn.addEventListener('click', () => {
-            console.log("Two player button clicked");
-            selectMode('two');
-        });
-    }
-    if (onlineBtn) {
-        onlineBtn.addEventListener('click', () => {
-            console.log("Online button clicked");
-            selectMode('online');
-        });
-    }
+    if (singleBtn) singleBtn.onclick = () => selectMode('single');
+    if (twoBtn) twoBtn.onclick = () => selectMode('two');
+    if (onlineBtn) onlineBtn.onclick = () => selectMode('online');
     
-    // Online mode buttons
     const createRoomBtn = document.getElementById('createRoomBtn');
     const joinRoomBtn = document.getElementById('joinRoomBtn');
     const copyRoomIdBtn = document.getElementById('copyRoomIdBtn');
     const backToMenuBtn = document.getElementById('backToMenuBtn');
     
-    if (createRoomBtn) {
-        createRoomBtn.addEventListener('click', () => {
-            console.log("Create room button clicked");
-            createRoom();
-        });
-    }
-    if (joinRoomBtn) {
-        joinRoomBtn.addEventListener('click', () => {
-            console.log("Join room button clicked");
-            joinRoom();
-        });
-    }
-    if (copyRoomIdBtn) {
-        copyRoomIdBtn.addEventListener('click', () => {
-            console.log("Copy room ID button clicked");
-            copyRoomId();
-        });
-    }
-    if (backToMenuBtn) {
-        backToMenuBtn.addEventListener('click', () => {
-            console.log("Back to menu button clicked");
-            goToMenu();
-        });
-    }
+    if (createRoomBtn) createRoomBtn.onclick = createRoom;
+    if (joinRoomBtn) joinRoomBtn.onclick = joinRoom;
+    if (copyRoomIdBtn) copyRoomIdBtn.onclick = copyRoomId;
+    if (backToMenuBtn) backToMenuBtn.onclick = goToMenu;
     
-    // Game buttons
     const homeBtn = document.getElementById('homeBtn');
     const resetBtn = document.getElementById('resetBtn');
     
-    if (homeBtn) {
-        homeBtn.addEventListener('click', () => {
-            console.log("Home button clicked");
-            goToMenu();
-        });
-    }
-    if (resetBtn) {
-        resetBtn.addEventListener('click', () => {
-            console.log("Reset button clicked");
-            resetGame();
-        });
-    }
+    if (homeBtn) homeBtn.onclick = goToMenu;
+    if (resetBtn) resetBtn.onclick = resetGame;
     
-    // Cell clicks
     const cells = document.querySelectorAll('.cell');
     cells.forEach(cell => {
-        cell.addEventListener('click', (e) => {
+        cell.onclick = (e) => {
             const index = parseInt(e.currentTarget.getAttribute('data-index'));
-            console.log("Cell event listener triggered for index:", index);
             handleClick(index);
-        });
+        };
     });
     
-    console.log("✅ Event listeners setup complete");
-    console.log("Found buttons:", {
-        singleBtn: !!singleBtn,
-        twoBtn: !!twoBtn,
-        onlineBtn: !!onlineBtn,
-        cells: cells.length
-    });
+    console.log("✅ Event listeners ready");
 });
